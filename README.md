@@ -7,6 +7,11 @@ Android 4.4+
 # Description
 Small mobile application for photo filtering using "coarse" compression.
 
+# Features
+ - Photo filters
+ - Collages
+ - Photos sharing 
+
 # Work process
 1. Make or download photo.
 2. Compress photos with the choice scale from 1 to 10
@@ -14,6 +19,6 @@ Small mobile application for photo filtering using "coarse" compression.
 4. Save "shakalizated" photo :)
 
 # Auditory
-People who have not enough storage space on device or who like compressed photos.
+People who have not enough storage space on device or who like compressed photos and me.
 
 Also a users who love such simple and fun programs.  
