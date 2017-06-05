@@ -5,9 +5,11 @@ import android.app.Activity;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.ColorFilter;
+import android.graphics.ColorMatrix;
+import android.graphics.ColorMatrixColorFilter;
 import android.graphics.Paint;
 import android.graphics.drawable.BitmapDrawable;
 import android.net.Uri;
@@ -29,32 +31,80 @@ import java.util.Date;
 
 public class MainActivity extends AppCompatActivity {
     private ImageView photo;
-    private SeekBar bar;
-    private Button filter1, save;
-    Bitmap bm;
+    private SeekBar scaleBar;
+    private Button filterRed, filterGreen, filterBlue, filterEmpty, saveButton;
+    private double scaleRate = 1.0;
+    Bitmap loadedBm, filteredBm;
+    float[] colorTransform;
+    ColorMatrix colorMatrix;
+    ColorFilter colorFilter;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
         photo = (ImageView) findViewById(R.id.imagePhoto);
         photo.setScaleType(ImageView.ScaleType.FIT_XY);
-        filter1 = (Button) findViewById(R.id.buttonFilter1);
-        save = (Button) findViewById(R.id.buttonSave);
-        filter1.setOnClickListener(new View.OnClickListener() {
+
+        filterEmpty = (Button) findViewById(R.id.buttonFilterEmpty);
+        filterRed = (Button) findViewById(R.id.buttonFilterRed);
+        filterGreen = (Button) findViewById(R.id.buttonFilterGreen);
+        filterBlue = (Button) findViewById(R.id.buttonFilterBlue);
+        saveButton = (Button) findViewById(R.id.buttonSave);
+
+        filterEmpty.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                filterRGB(128, 255, 255);
+                colorTransform = new float[]{
+                        1, 0, 0, 0, 0,
+                        0, 1, 0, 0, 0,
+                        0, 0, 1, 0, 0,
+                        0, 0, 0, 1, 0};
+                filterRGB();
             }
         });
-        save.setOnClickListener(new View.OnClickListener() {
+        filterRed.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-
+                colorTransform = new float[]{
+                        1, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0,
+                        0, 0, 0, 1, 0};
+                filterRGB();
+            }
+        });
+        filterGreen.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                colorTransform = new float[]{
+                        0, 0, 0, 0, 0,
+                        0, 1, 0, 0, 0,
+                        0, 0, 0, 0, 0,
+                        0, 0, 0, 1, 0};
+                filterRGB();
+            }
+        });
+        filterBlue.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                colorTransform = new float[]{
+                        0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0,
+                        0, 0, 1, 0, 0,
+                        0, 0, 0, 1, 0};
+                filterRGB();
+            }
+        });
+        saveButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
                 if (ActivityCompat.checkSelfPermission(MainActivity.this, Manifest.permission.WRITE_EXTERNAL_STORAGE)
                         != PackageManager.PERMISSION_GRANTED) {
 
                     if (ActivityCompat.shouldShowRequestPermissionRationale(MainActivity.this,
                             Manifest.permission.WRITE_EXTERNAL_STORAGE)) {
+
                     }
                     ActivityCompat.requestPermissions(MainActivity.this, new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE},
                             1);
@@ -63,13 +113,13 @@ public class MainActivity extends AppCompatActivity {
                 MediaStore.Images.Media.insertImage(getContentResolver(), ((BitmapDrawable)photo.getDrawable()).getBitmap(), new Date().toString(), "Shakalized photo");
             }
         });
-        bar = (SeekBar) findViewById(R.id.seekBar);
-        bar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+
+        scaleBar = (SeekBar) findViewById(R.id.seekBar);
+        scaleBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                photo.requestLayout();
-                Bitmap finalBitmap = Bitmap.createScaledBitmap(bm, photo.getWidth()*(101-progress)/100, photo.getHeight()*(101-progress)/100, false);
-                photo.setImageBitmap(finalBitmap);
+                scaleRate = (10.1-Math.sqrt(++progress))/10.0;
+                proceedImage(scaleRate);
             }
 
             @Override
@@ -115,40 +165,49 @@ public class MainActivity extends AppCompatActivity {
                 Uri uri = Uri.fromFile(targetFile);
 
                 photo.setImageURI(uri);
-                bm = ((BitmapDrawable)photo.getDrawable()).getBitmap();
+                loadedBm = ((BitmapDrawable)photo.getDrawable()).getBitmap();
+                filteredBm = loadedBm.copy(Bitmap.Config.ARGB_8888, true);
             } catch (IOException e) {
                 e.printStackTrace();
             }
         }
     }
 
-    private void filterRGB(double R, double G, double B) {
-        if (bm != null) {
-            Bitmap localbm = ((BitmapDrawable)photo.getDrawable()).getBitmap();
-            Bitmap newBmp = Bitmap.createBitmap(localbm.getWidth(), localbm.getHeight(), Bitmap.Config.ARGB_8888);
-            Canvas c = new Canvas(newBmp);
-            c.drawBitmap(localbm, 0, 0, new Paint());
-            for (int i=0; i<newBmp.getWidth(); i++)
-                for (int j=0; j<newBmp.getHeight(); j++) {
-                    byte blue = (byte) ((newBmp.getPixel(i, j) & 0xff));
-                    byte green = (byte) (((newBmp.getPixel(i, j) >> 8) & 0xff));
-                    byte red = (byte) (((newBmp.getPixel(i, j) >> 16) & 0xff));
-                    int newPixel= Color.rgb((int)(red*R), (int)(green*G), (int)(blue*B));
-                    newBmp.setPixel(i, j, newPixel);
-                }
-            photo.setImageBitmap(newBmp);
+    private void proceedImage(double scaledRate) {
+        photo.requestLayout();
+        if (filteredBm != null) {
+            Bitmap finalBitmap = Bitmap.createScaledBitmap(filteredBm, (int) (photo.getWidth() * scaledRate),
+                    (int) (photo.getHeight() * scaledRate), false);
+            photo.setImageBitmap(finalBitmap);
         }
     }
 
-    private void save(byte[] bytes, File file) throws IOException {
-        OutputStream output = null;
-        try {
-            output = new FileOutputStream(file);
-            output.write(bytes);
-        } finally {
-            if (null != output) {
-                output.close();
-            }
+    private void filterRGB() {
+        if (loadedBm != null) {
+            colorMatrix = new ColorMatrix(colorTransform);
+            colorFilter = new ColorMatrixColorFilter(colorMatrix);
+
+            filteredBm = loadedBm.copy(Bitmap.Config.ARGB_8888, true);
+            Paint paint = new Paint();
+            paint.setColorFilter(colorFilter);
+
+            Canvas canvas = new Canvas(filteredBm);
+            canvas.drawBitmap(filteredBm, 0, 0, paint);
+
+            proceedImage(scaleRate);
+            //photo.setImageBitmap(filteredBm);
         }
     }
+
+//    private void save(byte[] bytes, File file) throws IOException {
+//        OutputStream output = null;
+//        try {
+//            output = new FileOutputStream(file);
+//            output.write(bytes);
+//        } finally {
+//            if (null != output) {
+//                output.close();
+//            }
+//        }
+//    }
 }
