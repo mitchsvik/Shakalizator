@@ -5,8 +5,8 @@ import android.app.Activity;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
-import android.graphics.Color;
 import android.graphics.ColorFilter;
 import android.graphics.ColorMatrix;
 import android.graphics.ColorMatrixColorFilter;
@@ -21,6 +21,7 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.SeekBar;
+import android.widget.Toast;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -32,7 +33,7 @@ import java.util.Date;
 public class MainActivity extends AppCompatActivity {
     private ImageView photo;
     private SeekBar scaleBar;
-    private Button filterRed, filterGreen, filterBlue, filterEmpty, saveButton;
+    private Button filterRed, filterGreen, filterBlue, filterEmpty, saveButton,camera;
     private double scaleRate = 1.0;
     Bitmap loadedBm, filteredBm;
     float[] colorTransform;
@@ -111,6 +112,7 @@ public class MainActivity extends AppCompatActivity {
                     return;
                 }
                 MediaStore.Images.Media.insertImage(getContentResolver(), ((BitmapDrawable)photo.getDrawable()).getBitmap(), new Date().toString(), "Shakalized photo");
+                Toast.makeText(MainActivity.this,"Saved to gallery",Toast.LENGTH_SHORT).show();
             }
         });
 
@@ -141,12 +143,20 @@ public class MainActivity extends AppCompatActivity {
                 startActivityForResult(intent, 1);
             }
         });
+        camera = (Button) findViewById(R.id.camera);
+        camera.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Intent intent = new Intent(MainActivity.this,CameraView.class);
+                startActivityForResult(intent,2);
+            }
+        });
     }
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (resultCode == Activity.RESULT_OK) {
+        if (resultCode == Activity.RESULT_OK&&requestCode ==1) {
             if (data == null) {
                 return;
             }
@@ -171,6 +181,51 @@ public class MainActivity extends AppCompatActivity {
                 e.printStackTrace();
             }
         }
+        if(resultCode == RESULT_OK && requestCode == 2){
+            byte[] jpegData = App.getInstance().getCapturedPhotoData();
+            loadedBm = decodeSampledBitmapFromResourceMemOpt(jpegData, photo.getWidth(),
+                    photo.getHeight());
+            filteredBm = loadedBm.copy(Bitmap.Config.ARGB_8888, true);
+            photo.setImageBitmap(filteredBm);
+        }
+    }
+    public static Bitmap decodeSampledBitmapFromResourceMemOpt(
+            byte[] bytes, int reqWidth, int reqHeight) {
+        try {
+            final BitmapFactory.Options options = new BitmapFactory.Options();
+            options.inJustDecodeBounds = true;
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.length, options);
+
+            options.inSampleSize = calculateInSampleSize(options, reqWidth,
+                    reqHeight);
+            options.inPurgeable = true;
+            options.inInputShareable = true;
+            options.inJustDecodeBounds = false;
+            options.inPreferredConfig = Bitmap.Config.ARGB_8888;
+
+            return BitmapFactory.decodeByteArray(bytes, 0, bytes.length, options);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+
+            return null;
+        }
+    }
+    public static int calculateInSampleSize(BitmapFactory.Options options, int reqWidth, int reqHeight) {
+        final int height = options.outHeight;
+        final int width = options.outWidth;
+        int inSampleSize = 1;
+
+        if (height > reqHeight || width > reqWidth) {
+
+            final int heightRatio = Math.round((float) height / (float) reqHeight);
+            final int widthRatio = Math.round((float) width / (float) reqWidth);
+
+            inSampleSize = heightRatio < widthRatio ? heightRatio : widthRatio;
+        }
+
+
+        return inSampleSize;
     }
 
     private void proceedImage(double scaledRate) {
@@ -195,19 +250,6 @@ public class MainActivity extends AppCompatActivity {
             canvas.drawBitmap(filteredBm, 0, 0, paint);
 
             proceedImage(scaleRate);
-            //photo.setImageBitmap(filteredBm);
         }
     }
-
-//    private void save(byte[] bytes, File file) throws IOException {
-//        OutputStream output = null;
-//        try {
-//            output = new FileOutputStream(file);
-//            output.write(bytes);
-//        } finally {
-//            if (null != output) {
-//                output.close();
-//            }
-//        }
-//    }
 }
